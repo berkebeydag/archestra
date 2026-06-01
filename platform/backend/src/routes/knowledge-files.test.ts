@@ -256,6 +256,19 @@ describe("knowledge file routes", () => {
       }),
     });
     expect(upload.statusCode).toBe(200);
+    const fileId = upload.json().results[0].fileId as string;
+    const file = await KbUploadedFileModel.findById(fileId);
+    if (!file) throw new Error("Expected uploaded file to exist");
+    await KbDocumentModel.create({
+      organizationId,
+      connectorId: file.connectorId,
+      sourceId: fileId,
+      title: "runbook.txt",
+      content: "Operational notes",
+      contentHash: "runbook-content-hash",
+      embeddingStatus: "failed",
+      embeddingError: "api_key",
+    });
 
     const response = await app.inject({
       method: "GET",
@@ -267,6 +280,8 @@ describe("knowledge file routes", () => {
       expect.objectContaining({
         originalName: "runbook.txt",
         visibility: "personal",
+        embeddingStatus: "failed",
+        embeddingError: "api_key",
         assignedAgents: [
           expect.objectContaining({
             id: agent.id,

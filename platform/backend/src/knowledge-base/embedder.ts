@@ -1,6 +1,7 @@
 import { addNomicTaskPrefix, EMBEDDING_BATCH_SIZE } from "@shared";
 import logger from "@/logging";
 import { KbChunkModel, KbDocumentModel } from "@/models";
+import type { EmbeddingErrorKind } from "@/types";
 import {
   callEmbedding,
   type EmbeddingApiResponse,
@@ -40,7 +41,10 @@ class EmbeddingService {
       return;
     }
 
-    await KbDocumentModel.update(documentId, { embeddingStatus: "processing" });
+    await KbDocumentModel.update(documentId, {
+      embeddingStatus: "processing",
+      embeddingError: null,
+    });
 
     try {
       const chunks = await KbChunkModel.findByDocument(documentId);
@@ -48,6 +52,7 @@ class EmbeddingService {
       if (chunks.length === 0) {
         await KbDocumentModel.update(documentId, {
           embeddingStatus: "completed",
+          embeddingError: null,
           chunkCount: 0,
         });
         return;
@@ -81,6 +86,7 @@ class EmbeddingService {
 
       await KbDocumentModel.update(documentId, {
         embeddingStatus: "completed",
+        embeddingError: null,
         chunkCount: chunks.length,
       });
 
@@ -91,6 +97,7 @@ class EmbeddingService {
     } catch (error) {
       await KbDocumentModel.update(documentId, {
         embeddingStatus: "failed",
+        embeddingError: classifyEmbeddingError(error),
       });
       logger.error(
         {
@@ -151,6 +158,7 @@ class EmbeddingService {
 
       await KbDocumentModel.update(documentId, {
         embeddingStatus: "processing",
+        embeddingError: null,
       });
 
       const chunks = await KbChunkModel.findByDocument(documentId);
@@ -158,6 +166,7 @@ class EmbeddingService {
       if (chunks.length === 0) {
         await KbDocumentModel.update(documentId, {
           embeddingStatus: "completed",
+          embeddingError: null,
           chunkCount: 0,
         });
         continue;
@@ -187,6 +196,7 @@ class EmbeddingService {
       for (const { documentId } of docChunkMap) {
         await KbDocumentModel.update(documentId, {
           embeddingStatus: "pending",
+          embeddingError: null,
         });
       }
       return;
@@ -194,7 +204,7 @@ class EmbeddingService {
 
     const ctx = orgConfig.config;
     const embeddingResults = new Map<string, number[]>();
-    const failedChunkIds = new Set<string>();
+    const failedEmbeddingErrorByChunkId = new Map<string, EmbeddingErrorKind>();
 
     for (let i = 0; i < allChunks.length; i += EMBEDDING_BATCH_SIZE) {
       const batch = allChunks.slice(i, i + EMBEDDING_BATCH_SIZE);
@@ -212,17 +222,19 @@ class EmbeddingService {
           embeddingResults.set(batch[j].chunkId, response.data[j].embedding);
         }
       } catch (error) {
+        const embeddingError = classifyEmbeddingError(error);
         logger.error(
           {
             runId: connectorRunId,
             batchStart: i,
             batchSize: batch.length,
+            embeddingError,
             error: error instanceof Error ? error.message : String(error),
           },
           "[Embedder] Batch embedding API call failed",
         );
         for (const chunk of batch) {
-          failedChunkIds.add(chunk.chunkId);
+          failedEmbeddingErrorByChunkId.set(chunk.chunkId, embeddingError);
         }
       }
     }
@@ -232,22 +244,41 @@ class EmbeddingService {
       ([chunkId, embedding]) => ({ chunkId, embedding }),
     );
     if (successfulUpdates.length > 0) {
-      await KbChunkModel.updateEmbeddings(successfulUpdates, ctx.dimensions);
+      try {
+        await KbChunkModel.updateEmbeddings(successfulUpdates, ctx.dimensions);
+      } catch (error) {
+        const embeddingError = classifyEmbeddingError(error);
+        logger.error(
+          {
+            runId: connectorRunId,
+            embeddingError,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "[Embedder] Failed to write chunk embeddings",
+        );
+        for (const { chunkId } of successfulUpdates) {
+          failedEmbeddingErrorByChunkId.set(chunkId, embeddingError);
+        }
+      }
     }
 
     for (const { documentId, chunkIds, chunkCount } of docChunkMap) {
-      const anyFailed = chunkIds.some((id) => failedChunkIds.has(id));
-      if (anyFailed) {
+      const embeddingError = chunkIds
+        .map((id) => failedEmbeddingErrorByChunkId.get(id))
+        .find((error): error is EmbeddingErrorKind => Boolean(error));
+      if (embeddingError) {
         await KbDocumentModel.update(documentId, {
           embeddingStatus: "failed",
+          embeddingError,
         });
         logger.error(
-          { documentId, runId: connectorRunId },
+          { documentId, runId: connectorRunId, embeddingError },
           "[Embedder] Failed to embed document (batch failure)",
         );
       } else {
         await KbDocumentModel.update(documentId, {
           embeddingStatus: "completed",
+          embeddingError: null,
           chunkCount,
         });
         logger.info(
@@ -319,6 +350,54 @@ class EmbeddingService {
 export const embeddingService = new EmbeddingService();
 
 // ===== Internal helpers =====
+
+function classifyEmbeddingError(error: unknown): EmbeddingErrorKind {
+  const status =
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    typeof error.status === "number"
+      ? error.status
+      : undefined;
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("dimension") ||
+    normalized.includes("different vector size") ||
+    normalized.includes("vector dimensions")
+  ) {
+    return "dimensions_mismatch";
+  }
+  if (status === 429 || normalized.includes("rate limit")) {
+    return "rate_limit";
+  }
+  if (
+    status === 401 ||
+    status === 403 ||
+    normalized.includes("api key") ||
+    normalized.includes("unauthorized") ||
+    normalized.includes("forbidden")
+  ) {
+    return "api_key";
+  }
+  if (
+    status === 404 ||
+    normalized.includes("model not found") ||
+    normalized.includes("does not exist")
+  ) {
+    return "model_not_found";
+  }
+  if ((status && status >= 500) || normalized.includes("server error")) {
+    return "server_error";
+  }
+  return "unknown";
+}
 
 /**
  * Convert a raw chunk content string to an EmbeddingInput.

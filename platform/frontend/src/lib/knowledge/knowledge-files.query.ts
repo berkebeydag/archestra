@@ -17,6 +17,15 @@ const {
 
 export type KnowledgeFile =
   archestraApiTypes.GetKnowledgeFilesResponses["200"]["data"][number];
+export type KnowledgeFileEmbeddingError = NonNullable<
+  KnowledgeFile["embeddingError"]
+>;
+type KnowledgeFilesPaginatedResponse = Omit<
+  archestraApiTypes.GetKnowledgeFilesResponses["200"],
+  "data"
+> & {
+  data: KnowledgeFile[];
+};
 
 type KnowledgeFilesQuery = NonNullable<
   archestraApiTypes.GetKnowledgeFilesData["query"]
@@ -55,7 +64,7 @@ const ACTIVE_STATUSES = new Set<KnowledgeFileStatus>(["pending", "processing"]);
 export function useKnowledgeFilesPaginated(
   params: KnowledgeFilesPaginatedParams,
 ) {
-  return useQuery({
+  return useQuery<KnowledgeFilesPaginatedResponse | null>({
     queryKey: ["knowledge-files", "paginated", params],
     placeholderData: (previousData) => previousData,
     queryFn: async () => {
@@ -64,7 +73,7 @@ export function useKnowledgeFilesPaginated(
         handleApiError(error);
         return null;
       }
-      return data;
+      return data as KnowledgeFilesPaginatedResponse;
     },
     refetchInterval: (query) => {
       const hasActive = query.state.data?.data.some(

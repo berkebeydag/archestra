@@ -38,11 +38,17 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { TruncatedTooltip } from "@/components/ui/truncated-tooltip";
 import { DEFAULT_TABLE_LIMIT } from "@/consts";
 import {
   formatFileSize,
   type KnowledgeFile,
+  type KnowledgeFileEmbeddingError,
   useDeleteKnowledgeFile,
   useKnowledgeFilesPaginated,
   useKnowledgeFileUploadConfig,
@@ -505,10 +511,15 @@ function FileStatusBadge({ file }: { file: KnowledgeFile }) {
     );
   }
 
-  return (
+  const badge = (
     <Badge
       variant={file.embeddingStatus === "failed" ? "destructive" : "secondary"}
       className="text-xs"
+      title={
+        file.embeddingStatus === "failed"
+          ? getEmbeddingErrorLabel(file.embeddingError)
+          : undefined
+      }
     >
       {file.embeddingStatus === "processing" && (
         <Loader2 className="h-3 w-3 animate-spin" />
@@ -516,6 +527,39 @@ function FileStatusBadge({ file }: { file: KnowledgeFile }) {
       {file.embeddingStatus === "completed" ? "Indexed" : file.embeddingStatus}
     </Badge>
   );
+
+  if (file.embeddingStatus !== "failed") {
+    return badge;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{badge}</TooltipTrigger>
+      <TooltipContent className="max-w-72">
+        {getEmbeddingErrorLabel(file.embeddingError)}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function getEmbeddingErrorLabel(
+  embeddingError: KnowledgeFileEmbeddingError | null,
+) {
+  switch (embeddingError) {
+    case "rate_limit":
+      return "Embedding failed because the provider rate limit was reached.";
+    case "api_key":
+      return "Embedding failed because the embedding API credentials were rejected.";
+    case "model_not_found":
+      return "Embedding failed because the configured embedding model was not found.";
+    case "server_error":
+      return "Embedding failed because the embedding provider returned a server error.";
+    case "dimensions_mismatch":
+      return "Embedding failed because the configured model dimensions do not match the stored vector dimensions.";
+    case "unknown":
+    case null:
+      return "Embedding failed for an unknown reason.";
+  }
 }
 
 function VisibilityBadge({ file }: { file: KnowledgeFile }) {

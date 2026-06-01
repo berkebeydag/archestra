@@ -128637,6 +128637,28 @@
                               "failed"
                             ]
                           },
+                          "embeddingError": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "rate_limit",
+                                  "api_key",
+                                  "model_not_found",
+                                  "server_error",
+                                  "dimensions_mismatch",
+                                  "unknown"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  null
+                                ]
+                              }
+                            ]
+                          },
                           "chunkCount": {
                             "type": "integer",
                             "minimum": -2147483648,
@@ -128756,6 +128778,7 @@
                           "acl",
                           "metadata",
                           "embeddingStatus",
+                          "embeddingError",
                           "chunkCount",
                           "createdAt",
                           "updatedAt",
@@ -129139,6 +129162,28 @@
                         "failed"
                       ]
                     },
+                    "embeddingError": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "rate_limit",
+                            "api_key",
+                            "model_not_found",
+                            "server_error",
+                            "dimensions_mismatch",
+                            "unknown"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        }
+                      ]
+                    },
                     "chunkCount": {
                       "type": "integer",
                       "minimum": -2147483648,
@@ -129259,6 +129304,7 @@
                     "acl",
                     "metadata",
                     "embeddingStatus",
+                    "embeddingError",
                     "chunkCount",
                     "createdAt",
                     "updatedAt",
@@ -132808,6 +132854,28 @@
                               "failed"
                             ]
                           },
+                          "embeddingError": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "rate_limit",
+                                  "api_key",
+                                  "model_not_found",
+                                  "server_error",
+                                  "dimensions_mismatch",
+                                  "unknown"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  null
+                                ]
+                              }
+                            ]
+                          },
                           "assignedAgents": {
                             "type": "array",
                             "items": {
@@ -132845,6 +132913,7 @@
                           "processingStatus",
                           "processingError",
                           "embeddingStatus",
+                          "embeddingError",
                           "assignedAgents"
                         ],
                         "additionalProperties": false
@@ -133581,6 +133650,28 @@
                         "failed"
                       ]
                     },
+                    "embeddingError": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "rate_limit",
+                            "api_key",
+                            "model_not_found",
+                            "server_error",
+                            "dimensions_mismatch",
+                            "unknown"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        }
+                      ]
+                    },
                     "assignedAgents": {
                       "type": "array",
                       "items": {
@@ -133618,6 +133709,7 @@
                     "processingStatus",
                     "processingError",
                     "embeddingStatus",
+                    "embeddingError",
                     "assignedAgents"
                   ],
                   "additionalProperties": false
@@ -133990,6 +134082,28 @@
                         "failed"
                       ]
                     },
+                    "embeddingError": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "rate_limit",
+                            "api_key",
+                            "model_not_found",
+                            "server_error",
+                            "dimensions_mismatch",
+                            "unknown"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        }
+                      ]
+                    },
                     "assignedAgents": {
                       "type": "array",
                       "items": {
@@ -134027,6 +134141,7 @@
                     "processingStatus",
                     "processingError",
                     "embeddingStatus",
+                    "embeddingError",
                     "assignedAgents"
                   ],
                   "additionalProperties": false

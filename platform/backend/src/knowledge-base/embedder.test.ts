@@ -145,6 +145,7 @@ describe("EmbeddingService", () => {
 
     const updated = await KbDocumentModel.findById(doc.id);
     expect(updated?.embeddingStatus).toBe("failed");
+    expect(updated?.embeddingError).toBe("rate_limit");
   });
 
   test("no chunks marks document as completed with chunkCount 0", async ({
@@ -247,6 +248,7 @@ describe("EmbeddingService", () => {
 
     const updated = await KbDocumentModel.findById(doc.id);
     expect(updated?.embeddingStatus).toBe("completed");
+    expect(updated?.embeddingError).toBeNull();
     expect(mockEmbeddingsCreate).toHaveBeenCalledTimes(2);
   });
 
@@ -293,6 +295,7 @@ describe("EmbeddingService", () => {
 
     const updated = await KbDocumentModel.findById(doc.id);
     expect(updated?.embeddingStatus).toBe("failed");
+    expect(updated?.embeddingError).toBe("server_error");
     expect(mockEmbeddingsCreate).toHaveBeenCalledTimes(3);
   });
 
@@ -454,6 +457,7 @@ describe("EmbeddingService", () => {
 
     const updated1 = await KbDocumentModel.findById(doc1.id);
     expect(updated1?.embeddingStatus).toBe("failed");
+    expect(updated1?.embeddingError).toBe("unknown");
 
     // doc2 had no chunks, so it completes regardless
     const updated2 = await KbDocumentModel.findById(doc2.id);
